@@ -31,7 +31,7 @@ from processor import TikTokDataProcessor
 YTDLP_PATH = r"yt-dlp.exe"
 
 # =====================================================================
-# KHỞI TẠO BỘ NHỚ TẠM (SESSION STATE) - ĐẶT SAU SET_PAGE_CONFIG
+# KHỞI TẠO BỘ NHỚ TẠM (SESSION STATE)
 # =====================================================================
 if 'all_preds' not in st.session_state:
     st.session_state.all_preds = None  
@@ -228,10 +228,13 @@ def run_prediction_for_new_video(my_input):
     target_data[Col.CREATED_AT] = my_input['created_at']
 
     X_input = target_data[FEATURES].reindex(columns=FEATURES).fillna(0)
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    models_dir = os.path.join(current_dir, "..", "models")
+    
     models_path = {
-        "Linear Regression": r"C:\Users\Admin\OneDrive\Desktop\InvestigateLV\models\tiktok_linear_regression_multi.pkl",
-        "Random Forest": r"C:\Users\Admin\OneDrive\Desktop\InvestigateLV\models\tiktok_random_forest_multi.pkl",
-        "XGBoost": r"C:\Users\Admin\OneDrive\Desktop\InvestigateLV\models\tiktok_xgboost_multi.pkl"
+        "Linear Regression": os.path.join(models_dir, "tiktok_linear_regression_multi.pkl"),
+        "Random Forest": os.path.join(models_dir, "tiktok_random_forest_multi.pkl"),
+        "XGBoost": os.path.join(models_dir, "tiktok_xgboost_multi.pkl")
     }
 
     prediction_results = []
@@ -258,7 +261,8 @@ def run_prediction_for_new_video(my_input):
     return {
         "preds_dict": return_dict,
         "target_data": target_data,
-        "prediction_results": pd.DataFrame(prediction_results) if prediction_results else None
+        "prediction_results": pd.DataFrame(prediction_results) if prediction_results else None,
+        "raw_history": history # TRẢ VỀ RAW HISTORY ĐỂ LOG
     }
 
 
@@ -471,10 +475,12 @@ with tab_personal:
         result_data = get_file_content("result.csv")
         
         with c_btn1:
-            if feature_data:
+            if st.session_state.is_predicted and st.session_state.target_data_df is not None:
+                # Chuyển Dataframe thành định dạng CSV ngay trong bộ nhớ (dùng utf-8-sig để không lỗi font tiếng Việt)
+                csv_feature = st.session_state.target_data_df.to_csv(index=False).encode('utf-8-sig')
                 st.download_button(
                     label="📥 Save Feature (CSV)",
-                    data=feature_data,
+                    data=csv_feature,
                     file_name="debug_feature.csv",
                     mime="text/csv",
                     use_container_width=True,
@@ -484,10 +490,11 @@ with tab_personal:
                 st.button("📥 Save Feature (Trống)", disabled=True, use_container_width=True, type="secondary")
                 
         with c_btn2:
-            if result_data:
+            if st.session_state.is_predicted and st.session_state.result_data_df is not None:
+                csv_result = st.session_state.result_data_df.to_csv(index=False).encode('utf-8-sig')
                 st.download_button(
                     label="📥 Save Result (CSV)",
-                    data=result_data,
+                    data=csv_result,
                     file_name="result.csv",
                     mime="text/csv",
                     use_container_width=True,
@@ -519,6 +526,9 @@ with tab_personal:
                 st.session_state.result_data_df = res_payload["prediction_results"]
                 st.session_state.is_predicted = True
                 
+                # LƯU LẠI LOG ĐỂ HIỂN THỊ
+                st.session_state.raw_history_tab2 = res_payload.get("raw_history", [])
+                
                 st.success("✅ Phân tích xong! Số liệu đã được cập nhật.")
                 time.sleep(0.5)
                 st.rerun() 
@@ -535,6 +545,15 @@ with tab_personal:
         m1.metric("Predicted Views", f"{current_pred['views']:,}")
         m2.metric("Predicted Likes", f"{current_pred['likes']:,}")
         m3.metric("Predicted Shares", f"{current_pred['shares']:,}")
+        
+        # --- HIỂN THỊ LOG DEBUG CHO TAB 2 ---
+        if st.session_state.raw_history_tab2:
+            with st.expander("🛠 Debug Log: Thông tin chi tiết các video đã cào"):
+                log2_df = pd.DataFrame(st.session_state.raw_history_tab2)
+                if not log2_df.empty:
+                    log2_df['Ngày đăng'] = pd.to_datetime(log2_df['timestamp'], unit='s').dt.strftime('%Y-%m-%d %H:%M:%S')
+                    cols_to_show = ['post_id', 'Ngày đăng', Col.VIEWS, Col.LIKES, Col.SHARES, 'comments', 'collects']
+                    st.dataframe(log2_df[cols_to_show], use_container_width=True, hide_index=True)
         
         st.markdown("<br>", unsafe_allow_html=True)
         
@@ -598,6 +617,8 @@ with tab_business:
     if st.button("🔄 Tự động tính toán chỉ số trung bình (từ TikTok)", use_container_width=True, type="secondary"):
         with st.spinner("Đang cào dữ liệu từ TikTok cho các KOL... Vui lòng đợi..."):
             temp_df = st.session_state.biz_kol_df.copy()
+            all_logs_tab3 = []
+            
             for idx, row in temp_df.iterrows():
                 kol = str(row['name_of_creator']).strip()
                 if kol and kol.lower() not in ['none', 'nan', '']:
@@ -608,15 +629,30 @@ with tab_business:
                         temp_df.at[idx, 'share_avg'] = int(np.mean([h.get(Col.SHARES, 0) for h in history]))
                         temp_df.at[idx, 'comment_avg'] = int(np.mean([h.get('comments', 0) for h in history]))
                         temp_df.at[idx, 'collects_avg'] = int(np.mean([h.get('collects', 0) for h in history]))
+                        
+                        for h in history:
+                            h['KOL'] = kol
+                        all_logs_tab3.extend(history)
             
             st.session_state.biz_kol_df = temp_df
+            st.session_state.raw_history_tab3 = all_logs_tab3 # LƯU LOG VÀO STATE
             st.rerun() 
+            
+    # --- HIỂN THỊ LOG DEBUG CHO TAB 3 ---
+    if st.session_state.raw_history_tab3:
+        with st.expander("🛠 Debug Log: Thông tin chi tiết các video đã cào"):
+            log3_df = pd.DataFrame(st.session_state.raw_history_tab3)
+            if not log3_df.empty:
+                log3_df['Ngày đăng'] = pd.to_datetime(log3_df['timestamp'], unit='s').dt.strftime('%Y-%m-%d %H:%M:%S')
+                cols_to_show_3 = ['KOL', 'post_id', 'Ngày đăng', Col.VIEWS, Col.LIKES, Col.SHARES, 'comments', 'collects']
+                st.dataframe(log3_df[cols_to_show_3], use_container_width=True, hide_index=True)
 
     if st.button("📊 Dự đoán & Đề xuất KOL", type="primary", use_container_width=True):
         with st.spinner("Đang chạy mô hình dự đoán cho từng KOL. Vui lòng chờ..."):
             
             created_at_str = f"{biz_date.strftime('%Y-%m-%d')} {biz_time.strftime('%H:%M:%S')}+07:00"
             results_list = []
+            pred_logs_tab3 = []
             
             for idx, row in st.session_state.biz_kol_df.iterrows():
                 kol_name = str(row['name_of_creator']).strip()
@@ -636,6 +672,12 @@ with tab_business:
                     if res_payload and biz_model in res_payload["preds_dict"]:
                         preds = res_payload["preds_dict"][biz_model]
                         v, l, s = preds['views'], preds['likes'], preds['shares']
+                        
+                        # Cập nhật log từ predict
+                        h_data = res_payload.get('raw_history', [])
+                        for h in h_data:
+                            h['KOL'] = kol_name
+                        pred_logs_tab3.extend(h_data)
                     else:
                         v, l, s = int(row['view_avg']), int(row['like_avg']), int(row['share_avg'])
                     
@@ -649,6 +691,10 @@ with tab_business:
                     
                     results_list.append(row_data)
             
+            # Cập nhật state log nếu chạy predict có dữ liệu cào mới
+            if pred_logs_tab3:
+                st.session_state.raw_history_tab3 = pred_logs_tab3
+                
             if results_list:
                 result_df = pd.DataFrame(results_list)
                 result_df = result_df.sort_values("kol_score", ascending=False).reset_index(drop=True)
