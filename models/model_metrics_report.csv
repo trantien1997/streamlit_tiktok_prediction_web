@@ -1,0 +1,10 @@
+﻿Target_Variable,Model_Name,R2_Score,MAE,RMSE,Avg_Error_Pct
+likes_log1p,Linear Regression,0.328,1.1958,1.55,12.17
+likes_log1p,Random Forest,0.5061,1.0441,1.3288,10.12
+likes_log1p,XGBoost,0.5091,1.0314,1.3248,10.0
+views_log1p,Linear Regression,0.264,1.0882,1.4592,8.22
+views_log1p,Random Forest,0.4855,0.9475,1.22,6.87
+views_log1p,XGBoost,0.4771,0.946,1.2299,6.88
+shares_log1p,Linear Regression,0.1572,1.4206,1.8127,30.47
+shares_log1p,Random Forest,0.3365,1.2738,1.6083,25.46
+shares_log1p,XGBoost,0.3424,1.2637,1.6012,25.26
