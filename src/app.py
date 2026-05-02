@@ -499,9 +499,9 @@ with tab_personal:
         col_left, col_right = st.columns(2)
         
         with col_left:
-            kol_name = st.text_input("KOL Username", placeholder="Nhập username của KOL tại đây...", value="tranthanh123")
+            kol_name = st.text_input("KOL Username", placeholder="Nhập username của KOL tại đây...", value="")
             st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True)
-            followers = st.number_input("Số lượng Followers hiện tại", value=4400000)
+            followers = st.number_input("Số lượng Followers hiện tại", value=0)
             st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True)
             
             c_date, c_time = st.columns(2)
@@ -520,7 +520,7 @@ with tab_personal:
                 
             c_music, c_model = st.columns(2)
             with c_music:
-                music_name = st.text_input("🎵 Âm nhạc sử dụng", value="Original sound")
+                music_name = st.text_input("🎵 Âm nhạc sử dụng", placeholder="Nhập tên bài hát tại đây...",value="")
             with c_model:
                 selected_model = st.selectbox(
                     "🤖 Chọn mô hình dự đoán:", 
@@ -780,15 +780,44 @@ with tab_business:
                 
                 st.markdown("### 📊 Biểu đồ so sánh")
                 fig = go.Figure(data=[
-                    go.Bar(name='pred_views', x=result_df['name_of_creator'], y=result_df['pred_views'], marker_color='#FF2C55'), 
-                    go.Bar(name='pred_likes', x=result_df['name_of_creator'], y=result_df['pred_likes'], marker_color='#0066CC'),   
-                    go.Bar(name='pred_shares', x=result_df['name_of_creator'], y=result_df['pred_shares'], marker_color='#90CDF4') 
+                    go.Bar(
+                        name='Dự đoán Views', 
+                        x=result_df['name_of_creator'], 
+                        y=result_df['pred_views'], 
+                        marker_color='#FF2C55',
+                        text=result_df['pred_views'],
+                        textposition='outside',
+                        texttemplate='%{text:.2s}' # Giữ rút gọn cho triệu/nghìn views
+                    ), 
+                    go.Bar(
+                        name='Dự đoán Likes', 
+                        x=result_df['name_of_creator'], 
+                        y=result_df['pred_likes'], 
+                        marker_color='#0066CC',
+                        text=result_df['pred_likes'],
+                        textposition='outside',
+                        texttemplate='%{text:.2s}' # Giữ rút gọn cho nghìn likes
+                    ),   
+                    go.Bar(
+                        name='Dự đoán Shares', 
+                        x=result_df['name_of_creator'], 
+                        y=result_df['pred_shares'], 
+                        marker_color='#00F2EA',
+                        text=result_df['pred_shares'],
+                        textposition='outside',
+                        texttemplate='%{text:,}' # ĐÃ SỬA: Hiện số CHÍNH XÁC, không làm tròn cho Shares
+                    ) 
                 ])
+                
                 fig.update_layout(
-                    barmode='stack', 
-                    height=500,
-                    margin=dict(l=0, r=0, t=30, b=0),
-                    legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="left", x=0)
+                    barmode='group', 
+                    xaxis_title="Tên KOL (Creator)",
+                    yaxis_title="Số lượng tương tác dự đoán",
+                    height=550, 
+                    margin=dict(t=80, b=0), # Tăng lề trên để số liệu không bị mất
+                    legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="center", x=0.5),
+                    # Đảm bảo trục Y tự động co giãn tốt
+                    yaxis=dict(automargin=True)
                 )
                 st.plotly_chart(fig, use_container_width=True)
                 
