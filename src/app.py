@@ -11,9 +11,82 @@ import time
 import warnings
 import logging
 from datetime import datetime, time as dt_time
+import base64
+
+try:
+    from fpdf import FPDF
+except ImportError:
+    st.error("Vui lòng cài đặt thư viện fpdf bằng lệnh: pip install fpdf")
+
+# --- HÀM TẠO FILE PDF (ĐÃ BỔ SUNG CHÈN BIỂU ĐỒ) ---
+def create_pdf_report(campaign_info, result_df, chart_image_path=None):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", 'B', 16)
+    
+    # Tiêu đề
+    pdf.cell(200, 10, txt="BAO CAO DU DOAN HIEU QUA CHIEN DICH TIKTOK", ln=True, align='C')
+    pdf.ln(10)
+    
+    # 1. Thông tin chiến dịch
+    pdf.set_font("Arial", 'B', 12)
+    pdf.cell(200, 10, txt="1. THONG TIN CHIEN DICH:", ln=True)
+    pdf.set_font("Arial", '', 11)
+    pdf.cell(50, 10, txt="Thoi gian du kien:")
+    pdf.cell(150, 10, txt=f"{campaign_info['date']} {campaign_info['time']}", ln=True)
+    pdf.cell(50, 10, txt="Am nhac su dung:")
+    pdf.cell(150, 10, txt=campaign_info['music'].encode('latin-1', 'replace').decode('latin-1'), ln=True)
+    
+    pdf.ln(5)
+    
+    # 2. Bảng xếp hạng KOL
+    pdf.set_font("Arial", 'B', 12)
+    pdf.cell(200, 10, txt="2. KET QUA DU DOAN VA XEP HANG KOL:", ln=True)
+    pdf.set_font("Arial", 'B', 10)
+    
+    col_widths = [45, 25, 30, 30, 30, 25]
+    headers = ['KOL', 'Followers', 'Pred Views', 'Pred Likes', 'Pred Shares', 'Score']
+    for i, header in enumerate(headers):
+        pdf.cell(col_widths[i], 10, txt=header, border=1, align='C')
+    pdf.ln()
+    
+    pdf.set_font("Arial", '', 10)
+    for index, row in result_df.iterrows():
+        pdf.cell(col_widths[0], 10, txt=str(row['name_of_creator']), border=1, align='L')
+        pdf.cell(col_widths[1], 10, txt=f"{int(row['followers']):,}", border=1, align='R')
+        pdf.cell(col_widths[2], 10, txt=f"{int(row['pred_views']):,}", border=1, align='R')
+        pdf.cell(col_widths[3], 10, txt=f"{int(row['pred_likes']):,}", border=1, align='R')
+        pdf.cell(col_widths[4], 10, txt=f"{int(row['pred_shares']):,}", border=1, align='R')
+        pdf.cell(col_widths[5], 10, txt=f"{float(row['kol_score']):.1f}", border=1, align='R')
+        pdf.ln()
+    
+    pdf.ln(10)
+
+    # --- CHÈN BIỂU ĐỒ VÀO PDF ---
+    if chart_image_path and os.path.exists(chart_image_path):
+        pdf.set_font("Arial", 'B', 12)
+        pdf.cell(200, 10, txt="3. BIEU DO SO SANH:", ln=True)
+        pdf.image(chart_image_path, x=15, w=180)
+        pdf.ln(5)
+    
+    # 3/4. Kết luận
+    pdf.set_font("Arial", 'B', 12)
+    conclusion_title = "4. DE XUAT:" if chart_image_path else "3. DE XUAT:"
+    pdf.cell(200, 10, txt=conclusion_title, ln=True)
+    pdf.set_font("Arial", 'I', 11)
+    best_kol = result_df.iloc[0]['name_of_creator']
+    pdf.cell(200, 10, txt=f"-> He thong de xuat chon Creator '{best_kol}' cho chien dich nay.", ln=True)
+    
+    return pdf.output(dest='S').encode('latin1')
+
+# --- HÀM TẠO NÚT TẢI XUỐNG ---
+def get_pdf_download_link(pdf_bytes, filename):
+    b64 = base64.b64encode(pdf_bytes).decode()
+    href = f'<a href="data:application/pdf;base64,{b64}" download="{filename}" style="text-decoration: none;"><button style="background-color: white; color: #31333F; border: 1px solid #d3d3d3; border-radius: 8px; padding: 0.5rem 1rem; font-weight: 400; font-size: 14px; cursor: pointer; transition: 0.3s;" onmouseover="this.style.borderColor=\'#FF2C55\'; this.style.color=\'#FF2C55\'" onmouseout="this.style.borderColor=\'#d3d3d3\'; this.style.color=\'#31333F\'">📄 Tải báo cáo PDF</button></a>'
+    return href
 
 # =====================================================================
-# 1. CẤU HÌNH TRANG (BẮT BUỘC PHẢI NẰM Ở ĐÂY - TRƯỚC MỌI LỆNH STREAMLIT KHÁC)
+# 1. CẤU HÌNH TRANG
 # =====================================================================
 st.set_page_config(page_title="Hệ thống Dự đoán TikTok - UIT", layout="wide")
 
@@ -31,7 +104,7 @@ from processor import TikTokDataProcessor
 YTDLP_PATH = r"yt-dlp.exe"
 
 # =====================================================================
-# KHỞI TẠO BỘ NHỚ TẠM (SESSION STATE)
+# KHỞI TẠO BỘ NHỚ TẠM (SESSION STATE) - ĐÃ FIX LỖI THIẾU BIẾN
 # =====================================================================
 if 'all_preds' not in st.session_state:
     st.session_state.all_preds = None  
@@ -41,8 +114,13 @@ if 'target_data_df' not in st.session_state:
     st.session_state.target_data_df = None
 if 'result_data_df' not in st.session_state:
     st.session_state.result_data_df = None
+
+# VÁ LỖI TẠI ĐÂY: Khởi tạo biến lưu log cho Tab 2 và Tab 3
+if 'raw_history_tab2' not in st.session_state:
+    st.session_state.raw_history_tab2 = []
+if 'raw_history_tab3' not in st.session_state:
+    st.session_state.raw_history_tab3 = []
     
-# QUAN TRỌNG: Khởi tạo bảng dữ liệu Doanh nghiệp
 if 'biz_kol_df' not in st.session_state:
     st.session_state.biz_kol_df = pd.DataFrame({
         "name_of_creator": ["tranthanh123", "hariwonday", "khoailangthang"],
@@ -55,7 +133,7 @@ if 'biz_kol_df' not in st.session_state:
     })
 
 # =====================================================================
-# CÁC HÀM XỬ LÝ BACKEND (Cào dữ liệu & Xử lý đặc trưng)
+# CÁC HÀM XỬ LÝ BACKEND
 # =====================================================================
 def extract_basic_info(caption):
     if pd.isna(caption): caption = ""
@@ -262,7 +340,7 @@ def run_prediction_for_new_video(my_input):
         "preds_dict": return_dict,
         "target_data": target_data,
         "prediction_results": pd.DataFrame(prediction_results) if prediction_results else None,
-        "raw_history": history # TRẢ VỀ RAW HISTORY ĐỂ LOG
+        "raw_history": history 
     }
 
 
@@ -457,9 +535,9 @@ with tab_personal:
                 l_val = f"{data['likes']:,}"
                 s_val = f"{data['shares']:,}"
                 
-            ph_v.text_input("👀 View", value=v_val, disabled=True)
-            ph_l.text_input("❤️ Like", value=l_val, disabled=True)
-            ph_s.text_input("🔗 Share", value=s_val, disabled=True)
+            ph_v.text_input("👀 View", value=v_val, disabled=False)
+            ph_l.text_input("❤️ Like", value=l_val, disabled=False)
+            ph_s.text_input("🔗 Share", value=s_val, disabled=False)
         
         st.markdown("<br>", unsafe_allow_html=True) 
         
@@ -476,7 +554,6 @@ with tab_personal:
         
         with c_btn1:
             if st.session_state.is_predicted and st.session_state.target_data_df is not None:
-                # Chuyển Dataframe thành định dạng CSV ngay trong bộ nhớ (dùng utf-8-sig để không lỗi font tiếng Việt)
                 csv_feature = st.session_state.target_data_df.to_csv(index=False).encode('utf-8-sig')
                 st.download_button(
                     label="📥 Save Feature (CSV)",
@@ -487,7 +564,9 @@ with tab_personal:
                     type="secondary"
                 )
             else:
-                st.button("📥 Save Feature (Trống)", disabled=True, use_container_width=True, type="secondary")
+                # Đã bỏ disabled=True, thay bằng cảnh báo pop-up thân thiện
+                if st.button("📥 Save Feature (Trống)", use_container_width=True, type="secondary"):
+                    st.warning("⚠️ Vui lòng nhấn nút 'Predict' để phân tích dữ liệu trước khi tải xuống!")
                 
         with c_btn2:
             if st.session_state.is_predicted and st.session_state.result_data_df is not None:
@@ -501,7 +580,9 @@ with tab_personal:
                     type="secondary"
                 )
             else:
-                st.button("📥 Save Result (Trống)", disabled=True, use_container_width=True, type="secondary")
+                # Đã bỏ disabled=True, thay bằng cảnh báo pop-up thân thiện
+                if st.button("📥 Save Result (Trống)", use_container_width=True, type="secondary"):
+                    st.warning("⚠️ Vui lòng nhấn nút 'Predict' để phân tích dữ liệu trước khi tải xuống!")
                 
         with c_btn3:
             predict_btn = st.button("🚀 Predict", use_container_width=True, type="secondary")
@@ -526,7 +607,6 @@ with tab_personal:
                 st.session_state.result_data_df = res_payload["prediction_results"]
                 st.session_state.is_predicted = True
                 
-                # LƯU LẠI LOG ĐỂ HIỂN THỊ
                 st.session_state.raw_history_tab2 = res_payload.get("raw_history", [])
                 
                 st.success("✅ Phân tích xong! Số liệu đã được cập nhật.")
@@ -546,7 +626,6 @@ with tab_personal:
         m2.metric("Predicted Likes", f"{current_pred['likes']:,}")
         m3.metric("Predicted Shares", f"{current_pred['shares']:,}")
         
-        # --- HIỂN THỊ LOG DEBUG CHO TAB 2 ---
         if st.session_state.raw_history_tab2:
             with st.expander("🛠 Debug Log: Thông tin chi tiết các video đã cào"):
                 log2_df = pd.DataFrame(st.session_state.raw_history_tab2)
@@ -588,7 +667,6 @@ with tab_business:
         col_b_left, col_b_right = st.columns(2)
         
         with col_b_left:
-            # ĐÃ XÓA text_input KOL Username ở đây theo yêu cầu
             biz_music = st.text_input("🎵 Âm nhạc sử dụng", value="Original sound", key="biz_music")
             st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True)
             
@@ -599,7 +677,6 @@ with tab_business:
                 biz_time = st.time_input("Giờ đăng dự kiến", dt_time(19, 0), key="biz_time")
                 
         with col_b_right:
-            # Đã thu gọn chiều cao (height) từ 140 xuống 110 để cân đối với bên trái
             biz_caption = st.text_area("Nội dung Caption dự kiến", height=110, value="Sản phẩm mới cực chất! #trending #review", key="biz_caption")
             
             biz_model = st.selectbox(
@@ -635,10 +712,9 @@ with tab_business:
                         all_logs_tab3.extend(history)
             
             st.session_state.biz_kol_df = temp_df
-            st.session_state.raw_history_tab3 = all_logs_tab3 # LƯU LOG VÀO STATE
+            st.session_state.raw_history_tab3 = all_logs_tab3
             st.rerun() 
             
-    # --- HIỂN THỊ LOG DEBUG CHO TAB 3 ---
     if st.session_state.raw_history_tab3:
         with st.expander("🛠 Debug Log: Thông tin chi tiết các video đã cào"):
             log3_df = pd.DataFrame(st.session_state.raw_history_tab3)
@@ -673,7 +749,6 @@ with tab_business:
                         preds = res_payload["preds_dict"][biz_model]
                         v, l, s = preds['views'], preds['likes'], preds['shares']
                         
-                        # Cập nhật log từ predict
                         h_data = res_payload.get('raw_history', [])
                         for h in h_data:
                             h['KOL'] = kol_name
@@ -691,7 +766,6 @@ with tab_business:
                     
                     results_list.append(row_data)
             
-            # Cập nhật state log nếu chạy predict có dữ liệu cào mới
             if pred_logs_tab3:
                 st.session_state.raw_history_tab3 = pred_logs_tab3
                 
@@ -723,5 +797,31 @@ with tab_business:
                 
                 st.markdown("### ✅ Kết luận")
                 st.success(f"Doanh nghiệp nên ưu tiên chọn **{best_creator}** vì có điểm tổng hợp cao nhất ({best_score:,.2f}).")
+                
+                st.markdown("<br>", unsafe_allow_html=True)
+                
+                # Gom thông tin chiến dịch để truyền vào file PDF
+                campaign_data = {
+                    "date": biz_date.strftime("%d/%m/%Y"),
+                    "time": biz_time.strftime("%H:%M"),
+                    "music": biz_music,
+                    "model": biz_model,
+                    "caption": biz_caption
+                }
+                
+                # --- LƯU BIỂU ĐỒ VÀ GỌI HÀM PDF TẠI ĐÂY ---
+                temp_img_path = "temp_chart.png"
+                try:
+                    fig.write_image(temp_img_path)
+                    pdf_bytes = create_pdf_report(campaign_data, result_df, chart_image_path=temp_img_path)
+                    if os.path.exists(temp_img_path):
+                        os.remove(temp_img_path)
+                except Exception as e:
+                    st.warning("Không thể đính kèm biểu đồ vào PDF. Đảm bảo đã cài đặt 'kaleido'.")
+                    pdf_bytes = create_pdf_report(campaign_data, result_df)
+
+                pdf_filename = f"BaoCao_KOL_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+                st.markdown(get_pdf_download_link(pdf_bytes, pdf_filename), unsafe_allow_html=True)
+                
             else:
                 st.error("Không có KOL nào hợp lệ để tiến hành dự đoán!")
