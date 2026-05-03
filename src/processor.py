@@ -131,14 +131,6 @@ class TikTokDataProcessor:
         
         df[Col.AVG_VIEWS_3] = author_group[Col.VIEWS].transform(lambda x: x.shift(1).rolling(3, min_periods=1).mean()).fillna(0)
         df[Col.EMA_VIEWS_3] = author_group[Col.VIEWS].transform(lambda x: x.shift(1).ewm(span=3, adjust=False).mean()).fillna(0)
-        df[Col.AVG_LIKES_3] = author_group[Col.LIKES].transform(lambda x: x.shift(1).rolling(3, min_periods=1).mean()).fillna(0)
-        df[Col.EMA_LIKES_3] = author_group[Col.LIKES].transform(lambda x: x.shift(1).ewm(span=3, adjust=False).mean()).fillna(0)
-        df[Col.AVG_SHARES_3] = author_group[Col.SHARES].transform(lambda x: x.shift(1).rolling(3, min_periods=1).mean()).fillna(0)
-        df[Col.EMA_SHARES_3] = author_group[Col.SHARES].transform(lambda x: x.shift(1).ewm(span=3, adjust=False).mean()).fillna(0)
-        df[Col.AVG_COMMENTS_3] = author_group[Col.COMMENTS].transform(lambda x: x.shift(1).rolling(3, min_periods=1).mean()).fillna(0)
-        df[Col.EMA_COMMENTS_3] = author_group[Col.COMMENTS].transform(lambda x: x.shift(1).ewm(span=3, adjust=False).mean()).fillna(0)
-        df[Col.AVG_COLLECTS_3] = author_group[Col.COLLECTS].transform(lambda x: x.shift(1).rolling(3, min_periods=1).mean()).fillna(0)
-        df[Col.EMA_COLLECTS_3] = author_group[Col.COLLECTS].transform(lambda x: x.shift(1).ewm(span=3, adjust=False).mean()).fillna(0)
         df[Col.LIKE_RATE_TEMP] = df[Col.LIKES] / df[Col.VIEWS].replace(0, 1)
         df[Col.HIST_LIKE_RATE] = author_group[Col.LIKE_RATE_TEMP].transform(lambda x: x.shift(1).expanding().mean()).fillna(0)
         df[Col.DAYS_SINCE_POST] = author_group[Col.CREATED_AT].diff().dt.total_seconds().fillna(0) / 86400

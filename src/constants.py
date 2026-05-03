@@ -35,6 +35,7 @@ class Config:
 class Col:
     """Management of all column names for input and output data"""
     # --- Input columns ---
+    POST_ID = "post_id"
     MEDIA_URL = "media_url"
     CAPTION = "caption"
     CAPTION_CLEAN = "caption_clean"
@@ -74,14 +75,6 @@ class Col:
     # --- Momentum columns ---
     AVG_VIEWS_3 = "avg_views_last_3_videos"
     EMA_VIEWS_3 = "ema_views_last_3"
-    AVG_LIKES_3 = "avg_like_last_3_videos"
-    EMA_LIKES_3 = "ema_like_last_3"
-    AVG_SHARES_3 = "avg_shares_last_3_videos"
-    EMA_SHARES_3 = "ema_shares_last_3"
-    AVG_COMMENTS_3 = "avg_comments_last_3_videos"
-    EMA_COMMENTS_3 = "ema_comments_last_3"
-    AVG_COLLECTS_3 = "avg_collects_last_3_videos"
-    EMA_COLLECTS_3 = "ema_collects_last_3"
     LIKE_RATE_TEMP = "like_rate_temp"
     HIST_LIKE_RATE = "hist_like_rate"
     DAYS_SINCE_POST = "days_since_last_post"
@@ -119,14 +112,6 @@ FEATURES = [
     Col.FOLLOWERS,
     Col.EMA_VIEWS_3,
     Col.AVG_VIEWS_3,
-    Col.EMA_LIKES_3,
-    Col.AVG_LIKES_3,
-    Col.EMA_SHARES_3,
-    Col.AVG_SHARES_3,
-    Col.EMA_COMMENTS_3,
-    Col.AVG_COMMENTS_3,
-    Col.EMA_COLLECTS_3,
-    Col.AVG_COLLECTS_3,
     Col.HIST_LIKE_RATE,
     Col.DAYS_SINCE_POST,
     Col.IS_GAMESHOW,
