@@ -355,7 +355,7 @@ def run_prediction_for_new_video(my_input):
     models_dir = os.path.join(current_dir, "..", "models")
     
     models_path = {
-        "Linear Regression": r"C:\Users\Admin\OneDrive\Desktop\LinearRegression\models\tiktok_linear_regression_multi.pkl",
+        "Linear Regression": r"C:\Users\Admin\OneDrive\Desktop\streamlit_tiktok_prediction_web\models\tiktok_linear_regression_multi.pkl",
         "Random Forest": r"C:\Users\Admin\OneDrive\Desktop\streamlit_tiktok_prediction_web\models\tiktok_random_forest_multi.pkl",
         "XGBoost": r"C:\Users\Admin\OneDrive\Desktop\streamlit_tiktok_prediction_web\models\tiktok_xgboost_multi.pkl"
     }
