@@ -19,17 +19,75 @@ try:
 except ImportError:
     st.error("Vui lòng cài đặt thư viện fpdf bằng lệnh: pip install fpdf")
 
-# --- HÀM TẠO FILE PDF ---
+# =====================================================================
+# 1. CẤU HÌNH TRANG & LOAD MODELS
+# =====================================================================
+st.set_page_config(page_title="Hệ thống Dự đoán TikTok - UIT", layout="wide")
+
+logging.getLogger("transformers").setLevel(logging.ERROR)
+warnings.filterwarnings("ignore")
+
+from constants import PATHS, FEATURES, Config, Col
+from processor import TikTokDataProcessor
+
+YTDLP_PATH = r"C:\Users\Admin\OneDrive\Desktop\streamlit_tiktok_prediction_web\src\yt-dlp.exe"
+
+@st.cache_resource
+def get_ai_processor():
+    p = TikTokDataProcessor()
+    p.load_trends()
+    return p
+
+@st.cache_resource
+def load_ml_models():
+    loaded_models = {}
+    for name, path in PATHS["models"].items():
+        if os.path.exists(path):
+            loaded_models[name] = joblib.load(path)
+    return loaded_models
+
+# Khởi tạo toàn cục để dùng chung
+processor = get_ai_processor()
+models_dict = load_ml_models()
+
+# =====================================================================
+# KHỞI TẠO BỘ NHỚ TẠM (SESSION STATE)
+# =====================================================================
+if 'all_preds' not in st.session_state:
+    st.session_state.all_preds = None  
+if 'is_predicted' not in st.session_state:
+    st.session_state.is_predicted = False
+if 'target_data_df' not in st.session_state:
+    st.session_state.target_data_df = None
+if 'result_data_df' not in st.session_state:
+    st.session_state.result_data_df = None
+if 'raw_history_tab2' not in st.session_state:
+    st.session_state.raw_history_tab2 = []
+if 'raw_history_tab3' not in st.session_state:
+    st.session_state.raw_history_tab3 = []
+    
+if 'biz_kol_df' not in st.session_state:
+    st.session_state.biz_kol_df = pd.DataFrame({
+        "name_of_creator": ["tranthanh123", "hariwonday", "khoailangthang"],
+        "followers": [7500000, 4400000, 3300000],
+        "like_avg": [0, 0, 0],
+        "view_avg": [0, 0, 0],
+        "share_avg": [0, 0, 0],
+        "comment_avg": [0, 0, 0],
+        "collects_avg": [0, 0, 0]
+    })
+
+# =====================================================================
+# CÁC HÀM XỬ LÝ REPORT & BACKEND
+# =====================================================================
 def create_pdf_report(campaign_info, result_df, chart_image_path=None):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", 'B', 16)
     
-    # Tiêu đề
     pdf.cell(200, 10, txt="BAO CAO DU DOAN HIEU QUA CHIEN DICH TIKTOK", ln=True, align='C')
     pdf.ln(10)
     
-    # 1. Thông tin chiến dịch
     pdf.set_font("Arial", 'B', 12)
     pdf.cell(200, 10, txt="1. THONG TIN CHIEN DICH:", ln=True)
     pdf.set_font("Arial", '', 11)
@@ -40,7 +98,6 @@ def create_pdf_report(campaign_info, result_df, chart_image_path=None):
     
     pdf.ln(5)
     
-    # 2. Bảng xếp hạng KOL
     pdf.set_font("Arial", 'B', 12)
     pdf.cell(200, 10, txt="2. KET QUA DU DOAN VA XEP HANG KOL:", ln=True)
     pdf.set_font("Arial", 'B', 10)
@@ -63,14 +120,12 @@ def create_pdf_report(campaign_info, result_df, chart_image_path=None):
     
     pdf.ln(10)
 
-    # --- CHÈN BIỂU ĐỒ VÀO PDF ---
     if chart_image_path and os.path.exists(chart_image_path):
         pdf.set_font("Arial", 'B', 12)
         pdf.cell(200, 10, txt="3. BIEU DO SO SANH:", ln=True)
         pdf.image(chart_image_path, x=15, w=180)
         pdf.ln(5)
     
-    # 3/4. Kết luận
     pdf.set_font("Arial", 'B', 12)
     conclusion_title = "4. DE XUAT:" if chart_image_path else "3. DE XUAT:"
     pdf.cell(200, 10, txt=conclusion_title, ln=True)
@@ -80,125 +135,41 @@ def create_pdf_report(campaign_info, result_df, chart_image_path=None):
     
     return pdf.output(dest='S').encode('latin1')
 
-# --- HÀM TẠO NÚT TẢI XUỐNG ---
 def get_pdf_download_link(pdf_bytes, filename):
     b64 = base64.b64encode(pdf_bytes).decode()
     href = f'<a href="data:application/pdf;base64,{b64}" download="{filename}" style="text-decoration: none;"><button style="background-color: white; color: #31333F; border: 1px solid #d3d3d3; border-radius: 8px; padding: 0.5rem 1rem; font-weight: 400; font-size: 14px; cursor: pointer; transition: 0.3s;" onmouseover="this.style.borderColor=\'#FF2C55\'; this.style.color=\'#FF2C55\'" onmouseout="this.style.borderColor=\'#d3d3d3\'; this.style.color=\'#31333F\'">📄 Tải báo cáo PDF</button></a>'
     return href
-
-# =====================================================================
-# 1. CẤU HÌNH TRANG
-# =====================================================================
-st.set_page_config(page_title="Hệ thống Dự đoán TikTok - UIT", layout="wide")
-
-# ==========================================
-# CẤU HÌNH LOGGING & IMPORT MODEL BACKEND
-# ==========================================
-logging.getLogger("transformers").setLevel(logging.ERROR)
-logging.getLogger("httpx").setLevel(logging.ERROR)
-logging.getLogger("urllib3").setLevel(logging.ERROR)
-warnings.filterwarnings("ignore")
-
-from constants import PATHS, FEATURES, Config, Col
-from processor import TikTokDataProcessor
-
-YTDLP_PATH = r"yt-dlp.exe"
-
-# =====================================================================
-# KHỞI TẠO BỘ NHỚ TẠM (SESSION STATE)
-# =====================================================================
-if 'all_preds' not in st.session_state:
-    st.session_state.all_preds = None  
-if 'is_predicted' not in st.session_state:
-    st.session_state.is_predicted = False
-if 'target_data_df' not in st.session_state:
-    st.session_state.target_data_df = None
-if 'result_data_df' not in st.session_state:
-    st.session_state.result_data_df = None
-
-if 'raw_history_tab2' not in st.session_state:
-    st.session_state.raw_history_tab2 = []
-if 'raw_history_tab3' not in st.session_state:
-    st.session_state.raw_history_tab3 = []
-    
-if 'biz_kol_df' not in st.session_state:
-    st.session_state.biz_kol_df = pd.DataFrame({
-        "name_of_creator": ["tranthanh123", "hariwonday", "khoailangthang"],
-        "followers": [7500000, 4400000, 3300000],
-        "like_avg": [0, 0, 0],
-        "view_avg": [0, 0, 0],
-        "share_avg": [0, 0, 0],
-        "comment_avg": [0, 0, 0],
-        "collects_avg": [0, 0, 0]
-    })
-
-# =====================================================================
-# CÁC HÀM XỬ LÝ BACKEND (Cào dữ liệu & Xử lý đặc trưng)
-# =====================================================================
-def extract_features_from_caption(caption):
-    if pd.isna(caption): caption = ""
-    caption_str = str(caption).strip() 
-    
-    # Trích xuất hashtag
-    hashtags = re.findall(r'#(\w+)', caption_str)
-    hashtag_str = " ".join([f"#{h}" for h in hashtags]).lower()
-    
-    # Xử lý emoji
-    clean_text = re.sub(r'#\w+', '', caption_str)
-    try:
-        emojis = Config.EMOJI_PATTERN.findall(clean_text)
-        emoji_count = len(emojis)
-    except:
-        emoji_count = 0
-        
-    # Làm sạch văn bản để đếm từ và đo độ dài (Giống hệt file Demo)
-    clean_text = Config.EMOJI_PATTERN.sub('', clean_text)
-    clean_text = re.sub(r'[^\w\s]', '', clean_text) # Loại bỏ ký tự đặc biệt
-    clean_text = " ".join(clean_text.split()) 
-    
-    words = clean_text.split()
-    clean_len = len(clean_text)
-    
-    return {
-        "hashtag_count": len(hashtags),
-        "word_count": len(words), 
-        "caption_clean": clean_text.lower(),
-        "hashtag_str": hashtag_str,
-        "emoji_count": emoji_count, 
-        "caption_clean_len": clean_len,
-        "caption_length": clean_len # ĐỒNG BỘ ĐỘ DÀI
-    }
 
 def generate_post_recommendations(raw_input: dict, prediction: dict) -> list[str]:
     caption = raw_input.get("caption", "")
     music_name = raw_input.get("music_name", "")
     created_at = raw_input.get("created_at", datetime.now().isoformat())
     followers = int(raw_input.get("followers", 0) or 0)
-    info = extract_features_from_caption(caption)
+    info = processor.extract_caption_features(caption)
 
     recs = []
 
-    if info["caption_length"] < 15:
+    if info[Col.CAPTION_LEN] < 15:
         recs.append("Caption đang khá ngắn; nên thêm thông tin lợi ích, cảm xúc hoặc câu hook ở đầu caption.")
-    elif info["caption_length"] > 180:
+    elif info[Col.CAPTION_LEN] > 180:
         recs.append("Caption hơi dài; nên rút gọn, đưa ý chính lên đầu để người xem nắm nhanh.")
     else:
         recs.append("Độ dài caption tương đối ổn, có thể tiếp tục tối ưu bằng CTA rõ hơn.")
 
-    if info["hashtag_count"] < 3:
+    if info[Col.HASHTAG_COUNT] < 3:
         recs.append("Hashtag còn ít; nên thêm 3–5 hashtag gồm: hashtag ngành, hashtag trend và hashtag thương hiệu.")
-    elif info["hashtag_count"] > 8:
+    elif info[Col.HASHTAG_COUNT] > 8:
         recs.append("Hashtag hơi nhiều; nên giữ lại hashtag liên quan nhất để tránh cảm giác spam.")
     else:
         recs.append("Số lượng hashtag tương đối hợp lý.")
 
     generic_tags = ["#fyp", "#video", "#viral"]
-    if any(tag in info["hashtag_str"] for tag in generic_tags):
+    if any(tag in info[Col.HASHTAG_STR] for tag in generic_tags):
         recs.append("Hashtag như #fyp/#video khá chung; nên bổ sung hashtag cụ thể theo sản phẩm, ngành hoặc nhóm khách hàng.")
 
-    if info["emoji_count"] == 0:
+    if info[Col.EMOJI_COUNT] == 0:
         recs.append("Caption chưa có emoji; có thể thêm 1–3 emoji phù hợp để tăng độ nổi bật.")
-    elif info["emoji_count"] > 6:
+    elif info[Col.EMOJI_COUNT] > 6:
         recs.append("Emoji hơi nhiều; nên giảm để caption chuyên nghiệp và dễ đọc hơn.")
 
     hour = pd.to_datetime(created_at).hour
@@ -233,7 +204,6 @@ def get_latest_history_videos(kol_name, limit=3):
         "--quiet", "--no-warnings"
     ]
     history_data = []
-    vn_tz = pytz.timezone('Asia/Ho_Chi_Minh') # Định nghĩa múi giờ VN
     
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", timeout=200)
@@ -242,11 +212,10 @@ def get_latest_history_videos(kol_name, limit=3):
             for entry in entries:
                 ts = entry.get("timestamp")
                 if ts:
-                    # FIX: Chuyển đổi timestamp thành chuỗi giờ VN có nhãn +07:00 ngay từ đầu
-                    dt_vn = datetime.fromtimestamp(ts, tz=pytz.utc).astimezone(vn_tz)
+                    dt_vn = datetime.fromtimestamp(ts, tz=pytz.utc).astimezone(Config.TIMEZONE_VN)
                     created_at_val = dt_vn.strftime('%Y-%m-%d %H:%M:%S+07:00')
                 else:
-                    created_at_val = datetime.now(vn_tz).strftime('%Y-%m-%d %H:%M:%S+07:00')
+                    created_at_val = datetime.now(Config.TIMEZONE_VN).strftime('%Y-%m-%d %H:%M:%S+07:00')
 
                 stats = {
                     Col.POST_ID: entry.get("id"),
@@ -255,11 +224,12 @@ def get_latest_history_videos(kol_name, limit=3):
                     Col.SHARES: entry.get("repost_count", 0),
                     Col.COMMENTS: entry.get("comment_count", 0),
                     Col.COLLECTS: entry.get("save_count") or entry.get("favorite_count") or 0,
-                    Col.CREATED_AT: created_at_val, # Lưu chuỗi đã có múi giờ VN
+                    Col.CREATED_AT: created_at_val, 
                     Col.CAPTION: entry.get("description", ""),
                     Col.MUSIC_NAME: entry.get("track", "Original sound")
                 }
                 history_data.append(stats)
+            print("DEBUG: Fetched history data:", history_data)
         return history_data
     except Exception:
         return []
@@ -269,51 +239,41 @@ def run_prediction_for_new_video(my_input):
     if not history:
         return None
 
-    # Lấy thời gian từ history (Đã là chuỗi string giờ VN từ hàm get_latest_history_videos)
-    latest_video_timestamp_str = history[0].get(Col.CREATED_AT)
+    latest_video_timestamp_str = history[0].get(Col.CREATED_AT) if history else None
     if not latest_video_timestamp_str:
-        latest_video_timestamp_str = datetime.now(pytz.timezone('Asia/Ho_Chi_Minh')).strftime('%Y-%m-%d %H:%M:%S+07:00')
+        latest_video_timestamp_str = datetime.now(Config.TIMEZONE_VN).strftime('%Y-%m-%d %H:%M:%S+07:00')
     
     rows = []
     for h in reversed(history):
         row = {
             Col.AUTHOR: my_input['kol_name'],
             Col.MEDIA_URL: f"https://www.tiktok.com/@{my_input['kol_name']}/video/{h.get(Col.POST_ID, '')}",
-            
-            # ĐÃ SỬA CHUẨN: Lấy trực tiếp chuỗi thời gian, không dùng fromtimestamp nữa để tránh lỗi TypeError
             Col.CREATED_AT: h[Col.CREATED_AT],
-            
             Col.CAPTION: h.get(Col.CAPTION, ""),
             Col.MUSIC_NAME: h.get(Col.MUSIC_NAME, ""),
-            Col.VIEWS: h.get(Col.VIEWS, 0), Col.LIKES: h.get(Col.LIKES, 0), Col.SHARES: h.get(Col.SHARES, 0),
-            Col.COMMENTS: h.get(Col.COMMENTS, 0), Col.COLLECTS: h.get(Col.COLLECTS, 0),
-            Col.FOLLOWERS: my_input['followers'], Col.POST_ID: h.get(Col.POST_ID, '')
+            Col.VIEWS: h.get(Col.VIEWS, 0), 
+            Col.LIKES: h.get(Col.LIKES, 0), 
+            Col.SHARES: h.get(Col.SHARES, 0),
+            Col.COMMENTS: h.get(Col.COMMENTS, 0), 
+            Col.COLLECTS: h.get(Col.COLLECTS, 0),
+            Col.FOLLOWERS: my_input['followers'], 
+            Col.POST_ID: h.get(Col.POST_ID, '')
         }
-        # Cập nhật đặc trưng từ caption
-        row.update(extract_features_from_caption(h.get(Col.CAPTION, "")))
         rows.append(row)
 
-    # ĐỒNG BỘ MÚI GIỜ KHI TÍNH diff_days
-    vn_tz = pytz.timezone('Asia/Ho_Chi_Minh')
-    
-    # 1. Lấy giờ dự kiến đăng (Từ input của người dùng)
     target_post_time = pd.to_datetime(my_input['created_at'])
     if target_post_time.tzinfo is None:
-        target_post_time = vn_tz.localize(target_post_time)
+        target_post_time = Config.TIMEZONE_VN.localize(target_post_time)
     else:
-        target_post_time = target_post_time.astimezone(vn_tz)
+        target_post_time = target_post_time.astimezone(Config.TIMEZONE_VN)
 
-    # 2. Lấy giờ đăng video gần nhất
     last_post_time = pd.to_datetime(latest_video_timestamp_str)
     if last_post_time.tzinfo is None:
-        last_post_time = vn_tz.localize(last_post_time)
+        last_post_time = Config.TIMEZONE_VN.localize(last_post_time)
     else:
-        last_post_time = last_post_time.astimezone(vn_tz)
+        last_post_time = last_post_time.astimezone(Config.TIMEZONE_VN)
 
-    # 3. Tính khoảng cách
     diff_days = max(0, (target_post_time - last_post_time).total_seconds() / 86400)
-
-    target_features = extract_features_from_caption(my_input['caption'])
 
     new_video_row = {
         Col.AUTHOR: my_input['kol_name'],
@@ -323,65 +283,42 @@ def run_prediction_for_new_video(my_input):
         Col.MUSIC_NAME: my_input['music_name'],
         Col.VIEWS: 0, Col.LIKES: 0, Col.SHARES: 0, "comments": 0, "collects": 0,
         Col.FOLLOWERS: my_input['followers'], 
-        "post_id": "TARGET_PREDICT",
-        "days_since_last_post": diff_days
+        Col.POST_ID: "TARGET_PREDICT"
     }
-    # Cập nhật đặc trưng ngôn ngữ cho dòng dự đoán
-    new_video_row.update(target_features)
     rows.append(new_video_row)
 
     df_all = pd.DataFrame(rows)
-    
-    # Ép Pandas hiểu rõ múi giờ trong dataframe trước khi đưa vào Processor
     df_all[Col.CREATED_AT] = pd.to_datetime(df_all[Col.CREATED_AT])
-
-    processor = TikTokDataProcessor()
     processor.load_trends()
     processed_df = processor.process_features(df_all)
-
-    target_data = processed_df[processed_df['post_id'] == "TARGET_PREDICT"].copy()
+    target_data = processed_df[processed_df[Col.POST_ID] == "TARGET_PREDICT"].copy()
     
     # BẮT BUỘC GHI ĐÈ BẰNG KẾT QUẢ ĐÃ TÍNH ĐÚNG BÊN TRÊN
-    target_data['days_since_last_post'] = diff_days
-    target_data['caption_length'] = target_features['caption_clean_len']
+    target_data[Col.DAYS_SINCE_POST] = diff_days
     target_data[Col.CREATED_AT] = my_input['created_at']
-    target_data['debug_time'] = last_post_time
 
-    # Lưu file Debug Feature
     target_data.to_csv("debug_feature.csv", index=False, encoding='utf-8-sig')
-
     X_input = target_data[FEATURES].reindex(columns=FEATURES).fillna(0)
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    models_dir = os.path.join(current_dir, "..", "models")
-    
-    models_path = {
-        "Linear Regression": r"C:\Users\Admin\OneDrive\Desktop\streamlit_tiktok_prediction_web\models\tiktok_linear_regression_multi.pkl",
-        "Random Forest": r"C:\Users\Admin\OneDrive\Desktop\streamlit_tiktok_prediction_web\models\tiktok_random_forest_multi.pkl",
-        "XGBoost": r"C:\Users\Admin\OneDrive\Desktop\streamlit_tiktok_prediction_web\models\tiktok_xgboost_multi.pkl"
-    }
 
     prediction_results = []
     return_dict = {}
-    for name, path in models_path.items():
-        if os.path.exists(path):
-            try:
-                model = joblib.load(path)
-                preds = np.expm1(model.predict(X_input).flatten())
-                v, l, s = int(preds[1]), int(preds[0]), int(preds[2])
-                
-                return_dict[name] = {"views": v, "likes": l, "shares": s}
-                prediction_results.append({
-                    "author_username": my_input['kol_name'],
-                    "media_url": "UNPUBLISHED",
-                    "created_at": my_input['created_at'], 
-                    "caption": my_input['caption'],
-                    "model": name,
-                    "pred_views": v, "pred_likes": l, "pred_shares": s
-                })
-            except Exception as e:
-                pass
+    for name, model in models_dict.items():
+        try:
+            preds = np.expm1(model.predict(X_input).flatten())
+            v, l, s = int(preds[1]), int(preds[0]), int(preds[2])
+            
+            return_dict[name] = {"views": v, "likes": l, "shares": s}
+            prediction_results.append({
+                "author_username": my_input['kol_name'],
+                "media_url": "UNPUBLISHED",
+                "created_at": my_input['created_at'], 
+                "caption": my_input['caption'],
+                "model": name,
+                "pred_views": v, "pred_likes": l, "pred_shares": s
+            })
+        except Exception as e: 
+            print(f"Lỗi dự đoán model {name}: {e}")
 
-    # Lưu file Result
     if prediction_results:
         pd.DataFrame(prediction_results).to_csv("result.csv", index=False, encoding='utf-8-sig')
 
@@ -393,7 +330,7 @@ def run_prediction_for_new_video(my_input):
     }
 
 # =====================================================================
-# 2. CUSTOM CSS
+# CUSTOM CSS
 # =====================================================================
 st.markdown("""
     <style>
@@ -460,7 +397,6 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 3. THÔNG TIN CỐ ĐỊNH (Header & Đề tài)
 st.markdown("""
     <div class="uit-header">
         <h2 style='margin:0;'>ĐẠI HỌC QUỐC GIA TP.HỒ CHÍ MINH</h2>
@@ -481,7 +417,6 @@ st.markdown(f"""
     </div>
     """, unsafe_allow_html=True)
 
-# 4. TẠO TABS
 tab_overview, tab_personal, tab_business = st.tabs([
     "📊 Tổng quan mô hình Machine Learning", 
     "👤 Ứng dụng cá nhân", 
@@ -588,22 +523,13 @@ with tab_personal:
         
         c_btn1, c_btn2, c_btn3 = st.columns(3)
         
-        def get_file_content(file_path):
-            if os.path.exists(file_path):
-                with open(file_path, "rb") as f:
-                    return f.read()
-            return None
-        
         with c_btn1:
             if st.session_state.is_predicted and st.session_state.target_data_df is not None:
                 csv_feature = st.session_state.target_data_df.to_csv(index=False).encode('utf-8-sig')
                 st.download_button(
                     label="📥 Save Feature (CSV)",
-                    data=csv_feature,
-                    file_name="debug_feature.csv",
-                    mime="text/csv",
-                    use_container_width=True,
-                    type="secondary"
+                    data=csv_feature, file_name="debug_feature.csv", mime="text/csv",
+                    use_container_width=True, type="secondary"
                 )
             else:
                 if st.button("📥 Save Feature (Trống)", use_container_width=True, type="secondary"):
@@ -614,11 +540,8 @@ with tab_personal:
                 csv_result = st.session_state.result_data_df.to_csv(index=False).encode('utf-8-sig')
                 st.download_button(
                     label="📥 Save Result (CSV)",
-                    data=csv_result,
-                    file_name="result.csv",
-                    mime="text/csv",
-                    use_container_width=True,
-                    type="secondary"
+                    data=csv_result, file_name="result.csv", mime="text/csv",
+                    use_container_width=True, type="secondary"
                 )
             else:
                 if st.button("📥 Save Result (Trống)", use_container_width=True, type="secondary"):
@@ -629,7 +552,7 @@ with tab_personal:
 
     if predict_btn:
         with st.spinner(f"Đang thu thập dữ liệu và phân tích mô hình..."):
-            vn_tz = pytz.timezone('Asia/Ho_Chi_Minh')
+            vn_tz = Config.TIMEZONE_VN
             dt_combined = datetime.combine(d_date, d_time)
             dt_aware = vn_tz.localize(dt_combined)
             created_at_str = dt_aware.strftime('%Y-%m-%d %H:%M:%S+07:00')
@@ -678,7 +601,6 @@ with tab_personal:
                     st.dataframe(log2_df[cols_to_show], use_container_width=True, hide_index=True)
         
         st.markdown("<br>", unsafe_allow_html=True)
-        
         st.markdown("### 🧠 Nhận xét cải thiện nội dung")
         
         raw_input_for_rec = {
@@ -696,15 +618,13 @@ with tab_personal:
         st.markdown("<br>", unsafe_allow_html=True)
         
         st.markdown("### 🔍 Feature được trích xuất")
-        extracted_info = extract_features_from_caption(caption)
+        extracted_info = processor.extract_caption_features(caption)
         df_features = pd.DataFrame([extracted_info])
         st.dataframe(df_features, use_container_width=True, hide_index=True)
 
 # --- TAB 3: ỨNG DỤNG DOANH NGHIỆP ---
-# --- TAB 3: ỨNG DỤNG DOANH NGHIỆP ---
 with tab_business:
     st.header("🏢 So sánh & Lựa chọn KOL cho Doanh nghiệp")
-    
     st.info("Doanh nghiệp có thể nhập thông tin chiến dịch và danh sách KOL để hệ thống tự động tính điểm, gợi ý Creator phù hợp nhất.")
     
     with st.container():
@@ -751,8 +671,7 @@ with tab_business:
                         temp_df.at[idx, 'comment_avg'] = int(np.mean([h.get(Col.COMMENTS, 0) for h in history]))
                         temp_df.at[idx, 'collects_avg'] = int(np.mean([h.get(Col.COLLECTS, 0) for h in history]))
                         
-                        for h in history:
-                            h['KOL'] = kol
+                        for h in history: h['KOL'] = kol
                         all_logs_tab3.extend(history)
             
             st.session_state.biz_kol_df = temp_df
@@ -763,7 +682,6 @@ with tab_business:
         with st.expander("🛠 Debug Log: Thông tin chi tiết các video đã cào"):
             log3_df = pd.DataFrame(st.session_state.raw_history_tab3)
             if not log3_df.empty:
-                # ĐÃ ĐỒNG BỘ: Không còn unit='s' để tránh ValueError, tự động parse chuỗi +07:00
                 log3_df['Ngày đăng'] = pd.to_datetime(log3_df[Col.CREATED_AT]).dt.strftime('%Y-%m-%d %H:%M:%S')
                 cols_to_show_3 = ['KOL', Col.POST_ID, 'Ngày đăng', Col.VIEWS, Col.LIKES, Col.SHARES, Col.COMMENTS, Col.COLLECTS]
                 st.dataframe(log3_df[cols_to_show_3], use_container_width=True, hide_index=True)
@@ -771,8 +689,7 @@ with tab_business:
     if st.button("📊 Dự đoán & Đề xuất KOL", type="primary", use_container_width=True):
         with st.spinner("Đang chạy mô hình dự đoán cho từng KOL. Vui lòng chờ..."):
             
-            # ĐÃ ĐỒNG BỘ: Setup biến input đầu vào gắn mác giờ VN (+07:00) y hệt Tab 2
-            vn_tz = pytz.timezone('Asia/Ho_Chi_Minh')
+            vn_tz = Config.TIMEZONE_VN
             dt_combined_biz = datetime.combine(biz_date, biz_time)
             dt_aware_biz = vn_tz.localize(dt_combined_biz)
             created_at_str = dt_aware_biz.strftime('%Y-%m-%d %H:%M:%S+07:00')
@@ -790,10 +707,9 @@ with tab_business:
                         "music_name": biz_music, 
                         "kol_name": kol_name,
                         "followers": followers,
-                        "created_at": created_at_str # Chuỗi thời gian đã đồng bộ
+                        "created_at": created_at_str 
                     }
                     
-                    # Gọi hàm xử lý (Hàm này đã được chúng ta fix lỗi timezone triệt để ở trên)
                     res_payload = run_prediction_for_new_video(my_input)
                     
                     if res_payload and biz_model in res_payload["preds_dict"]:
@@ -801,8 +717,7 @@ with tab_business:
                         v, l, s = preds['views'], preds['likes'], preds['shares']
                         
                         h_data = res_payload.get('raw_history', [])
-                        for h in h_data:
-                            h['KOL'] = kol_name
+                        for h in h_data: h['KOL'] = kol_name
                         pred_logs_tab3.extend(h_data)
                     else:
                         v, l, s = int(row['view_avg']), int(row['like_avg']), int(row['share_avg'])
@@ -825,38 +740,22 @@ with tab_business:
                 result_df = result_df.sort_values("kol_score", ascending=False).reset_index(drop=True)
                 
                 st.markdown("---")
-                
                 st.markdown("### 📌 Kết quả dự đoán theo từng KOL")
                 st.dataframe(result_df, use_container_width=True)
                 
                 st.markdown("### 📊 Biểu đồ so sánh")
                 fig = go.Figure(data=[
                     go.Bar(
-                        name='Dự đoán Views', 
-                        x=result_df['name_of_creator'], 
-                        y=result_df['pred_views'], 
-                        marker_color='#FF2C55',
-                        text=result_df['pred_views'],
-                        textposition='outside',
-                        texttemplate='%{text:.2s}'
+                        name='Dự đoán Views', x=result_df['name_of_creator'], y=result_df['pred_views'], 
+                        marker_color='#FF2C55', text=result_df['pred_views'], textposition='outside', texttemplate='%{text:.2s}'
                     ), 
                     go.Bar(
-                        name='Dự đoán Likes', 
-                        x=result_df['name_of_creator'], 
-                        y=result_df['pred_likes'], 
-                        marker_color='#0066CC',
-                        text=result_df['pred_likes'],
-                        textposition='outside',
-                        texttemplate='%{text:.2s}'
+                        name='Dự đoán Likes', x=result_df['name_of_creator'], y=result_df['pred_likes'], 
+                        marker_color='#0066CC', text=result_df['pred_likes'], textposition='outside', texttemplate='%{text:.2s}'
                     ),   
                     go.Bar(
-                        name='Dự đoán Shares', 
-                        x=result_df['name_of_creator'], 
-                        y=result_df['pred_shares'], 
-                        marker_color='#00F2EA',
-                        text=result_df['pred_shares'],
-                        textposition='outside',
-                        texttemplate='%{text:,}' 
+                        name='Dự đoán Shares', x=result_df['name_of_creator'], y=result_df['pred_shares'], 
+                        marker_color='#00F2EA', text=result_df['pred_shares'], textposition='outside', texttemplate='%{text:,}' 
                     ) 
                 ])
                 
@@ -899,6 +798,5 @@ with tab_business:
 
                 pdf_filename = f"BaoCao_KOL_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
                 st.markdown(get_pdf_download_link(pdf_bytes, pdf_filename), unsafe_allow_html=True)
-                
             else:
                 st.error("Không có KOL nào hợp lệ để tiến hành dự đoán!")
