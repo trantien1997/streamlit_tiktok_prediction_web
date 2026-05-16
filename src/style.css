@@ -1,5 +1,6 @@
 /* ── Fonts ──────────────────────────────────────── */
 @import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/icon?family=Material+Icons+Round');
 
 /* ── CSS Variables ──────────────────────────────── */
 :root {
@@ -117,28 +118,32 @@ div[data-testid="stButton"] > button,
 div[data-testid="stDownloadButton"] > button {
     border-radius: var(--radius-sm) !important;
     font-weight: 600 !important;
-    transition: all .2s ease !important;
+    padding: 10px 22px !important;
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+    width: 100% !important;
 }
 div[data-testid="stButton"] > button[kind="secondary"],
 div[data-testid="stDownloadButton"] > button[kind="secondary"] {
     background: var(--surface) !important;
-    border: 1.5px solid var(--border) !important;
-    color: var(--text) !important;
+    border: 1.5px solid var(--primary-mid) !important;
+    color: var(--primary-mid) !important;
 }
 div[data-testid="stButton"] > button[kind="secondary"]:hover,
 div[data-testid="stDownloadButton"] > button[kind="secondary"]:hover {
+    background: #EBF2FF !important;
     border-color: var(--primary) !important;
     color: var(--primary) !important;
 }
 div[data-testid="stButton"] > button[kind="primary"] {
-    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-mid) 100%) !important;
+    background: linear-gradient(135deg, #003E8A 0%, #0072E5 100%) !important;
     border: none !important;
     color: #fff !important;
-    box-shadow: 0 3px 10px rgba(0,62,138,.28) !important;
+    box-shadow: 0 4px 15px rgba(0, 62, 138, 0.3) !important;
 }
 div[data-testid="stButton"] > button[kind="primary"]:hover {
-    box-shadow: 0 5px 18px rgba(0,62,138,.4) !important;
-    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(0, 62, 138, 0.5) !important;
+    transform: translateY(-2px) scale(1.01);
+    color: #ffffff !important;
 }
 
 /* ── Disabled inputs (pred values) ──────────────── */
@@ -173,13 +178,43 @@ div[data-testid="stTextInput"] input:disabled {
 [data-testid="stError"]   { border-radius: var(--radius-sm); }
 
 /* ── Data editor / table ────────────────────────── */
-[data-testid="stDataFrame"] { width: 100%; border-radius: var(--radius); overflow: hidden; }
+div[data-testid="stDataFrame"],
+div[data-testid="stDataFrame"] > div {
+    background-color: #ffffff !important; /* Trả lại nền trắng tinh khôi */
+    border: 1px solid #E2E8F0 !important; /* Viền xám mảnh siêu mượt */
+    border-radius: 8px !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05) !important; /* Đổ bóng nhẹ sang trọng */
+}
+
+/* Triệt tiêu tận gốc mọi bộ lọc làm mờ đục hoặc đổi màu Canvas */
+div[data-testid="stDataFrame"] canvas {
+    filter: none !important;
+    opacity: 1 !important;
+}
+
+/* Định dạng thanh tiêu đề tinh tế, tạo cảm giác đồng bộ với các Tab phía trên */
+div[data-testid="stDataFrame"] th,
+div[data-testid="stDataFrame"] [data-testid="StyledDataTable"] th {
+    background-color: #F8FAFC !important; /* Nền xám trắng nhẹ nhàng */
+    color: #0F172A !important; /* Màu chữ gần đen, tương phản cực cao */
+    font-weight: 700 !important;
+    font-size: 0.82rem !important;
+    text-transform: uppercase !important; /* Tự động viết hoa tiêu đề thanh lịch */
+    letter-spacing: 0.5px !important; /* Giãn cách chữ chuyên nghiệp */
+}
 
 /* ── Expander ───────────────────────────────────── */
-[data-testid="stExpander"] {
-    background: var(--surface);
-    border: 1px solid var(--border) !important;
+div[data-testid="stExpander"] {
+    background: var(--surface) !important;
+    border: none !important;
     border-radius: var(--radius) !important;
+    box-shadow: var(--shadow-md) !important;
+    padding: 6px 12px;
+}
+div[data-testid="stExpander"] summary {
+    font-weight: 700 !important;
+    color: var(--primary) !important;
+    font-size: 1.05rem !important;
 }
 
 /* ── KOL score badge ────────────────────────────── */
@@ -191,6 +226,16 @@ div[data-testid="stTextInput"] input:disabled {
     font-size: .85rem;
     border-radius: 20px;
     padding: 3px 12px;
+}
+
+/* ── Chart Container Wrapper ────────────────────── */
+.chart-container {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 24px;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border);
+    margin-top: 20px;
 }
 
 /* ── Footer ─────────────────────────────────────── */

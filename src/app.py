@@ -97,24 +97,24 @@ def render_header() -> None:
     </div>
     """, unsafe_allow_html=True)
 
-def section_header(icon: str, title: str) -> None:
+def section_header(icon_name: str, title: str) -> None:
     st.markdown(f"""
-    <div class="section-header">
-        <span style="font-size:1.1rem">{icon}</span>
-        <h3>{title}</h3>
+    <div class="section-header" style="display: flex; align-items: center; gap: 8px;">
+        <span class="material-icons-round" style="color: var(--primary-mid); font-size: 1.4rem;">{icon_name}</span>
+        <h3 style="margin: 0; padding: 0;">{title}</h3>
     </div>""", unsafe_allow_html=True)
 
 def pred_cards(views: int, likes: int, shares: int) -> None:
     c1, c2, c3 = st.columns(3)
     for col, icon, label, val, color in [
-        (c1, "👀", "Predicted Views",  views,  "#003E8A"),
-        (c2, "❤️", "Predicted Likes",  likes,  "#FF2C55"),
-        (c3, "🔗", "Predicted Shares", shares, "#00C9C3"),
+        (c1, "visibility", "Predicted Views",  views,  "#003E8A"),
+        (c2, "favorite", "Predicted Likes",  likes,  "#FF2C55"),
+        (c3, "share", "Predicted Shares", shares, "#00C9C3"),
     ]:
         with col:
             st.markdown(f"""
             <div class="pred-card">
-                <div class="icon">{icon}</div>
+                <div class="icon" style="margin-bottom: 6px;"><span class="material-icons-round" style="font-size: 2rem; color:{color};">{icon}</span></div>
                 <div class="label">{label}</div>
                 <div class="value" style="color:{color}">{val:,}</div>
             </div>""", unsafe_allow_html=True)
@@ -137,7 +137,7 @@ def history_debug_expander(history_list: list, extra_col: str = None) -> None:
 # TAB 1 — MODEL OVERVIEW
 # ════════════════════════════════════════════════════════════════════════════
 def tab_overview_content() -> None:
-    section_header("📈", "Đánh giá hiệu năng các mô hình huấn luyện")
+    section_header("analytics", "Đánh giá hiệu năng mô hình huấn luyện")
 
     csv_path = os.path.join(
         os.path.dirname(os.path.abspath(__file__)),
@@ -194,24 +194,37 @@ def tab_overview_content() -> None:
 # TAB 2 — PERSONAL PREDICTION
 # ════════════════════════════════════════════════════════════════════════════
 def tab_personal_content(processor_obj, models: dict) -> None:
-    section_header("👤", "Dự đoán hiệu quả bài post cá nhân")
+    section_header("account_circle", "Dự đoán hiệu quả bài post cá nhân")
 
     with st.expander("📝 Nhập thông tin video cần dự đoán", expanded=True):
         col_l, col_r = st.columns(2, gap="large")
 
         with col_l:
-            kol_name   = st.text_input("KOL Username", placeholder="vd: quangtuanofficial0302")
-            followers  = st.number_input("Số Followers hiện tại", min_value=0, value=0, step=1000)
-            video_path = st.text_input("🎬 Đường dẫn MP4 (tuỳ chọn)", placeholder=r"C:\Video\tiktok.mp4")
-
+            st.markdown('<div class="custom-label" style="display: flex; align-items: center; gap: 6px;"><span class="material-icons-round" style="color: #0057BE; font-size: 1.15rem; vertical-align: middle;">account_circle</span><span style="font-weight: 600; font-size: 0.85rem; color: var(--text); vertical-align: middle;">KOL Username</span></div>', unsafe_allow_html=True)
+            kol_name   = st.text_input("KOL Username", placeholder="vd: quangtuanofficial0302", label_visibility="collapsed")
+            st.markdown('<div class="custom-label" style="display: flex; align-items: center; gap: 6px;"><span class="material-icons-round" style="color: #6366F1; font-size: 1.15rem; vertical-align: middle;">groups</span><span style="font-weight: 600; font-size: 0.85rem; color: var(--text); vertical-align: middle;">Số Followers hiện tại</span></div>', unsafe_allow_html=True)
+            followers  = st.number_input("Số Followers hiện tại", min_value=0, value=0, step=1000, label_visibility="collapsed")
+            st.markdown('<div class="custom-label" style="display: flex; align-items: center; gap: 6px;"><span class="material-icons-round" style="color: #FF2C55; font-size: 1.15rem; vertical-align: middle;">movie</span><span style="font-weight: 600; font-size: 0.85rem; color: var(--text); vertical-align: middle;">Đường dẫn MP4 (tuỳ chọn)</span></div>', unsafe_allow_html=True)
+            video_path = st.text_input("Đường dẫn MP4", placeholder=r"C:\Video\tiktok.mp4", label_visibility="collapsed")
+            
             c_d, c_t = st.columns(2)
-            post_date = c_d.date_input("Ngày đăng dự kiến", datetime.now())
-            post_time = c_t.time_input("Giờ đăng dự kiến",  dt_time(19, 0))
+            with c_d:
+                st.markdown('<div class="custom-label" style="display: flex; align-items: center; gap: 6px;"><span class="material-icons-round" style="color: #0CAF60; font-size: 1.15rem; vertical-align: middle;">calendar_month</span><span style="font-weight: 600; font-size: 0.85rem; color: var(--text); vertical-align: middle;">Ngày đăng dự kiến</span></div>', unsafe_allow_html=True)
+                post_date = st.date_input("Ngày đăng dự kiến", datetime.now(), label_visibility="collapsed")
+
+            with c_t:
+                st.markdown('<div class="custom-label" style="display: flex; align-items: center; gap: 6px;"><span class="material-icons-round" style="color: #F59E0B; font-size: 1.15rem; vertical-align: middle;">schedule</span><span style="font-weight: 600; font-size: 0.85rem; color: var(--text); vertical-align: middle;">Giờ đăng dự kiến</span></div>', unsafe_allow_html=True)
+                post_time = st.time_input("Giờ đăng dự kiến",  dt_time(19, 0), label_visibility="collapsed")
 
         with col_r:
-            caption    = st.text_area("Nội dung Caption (kèm hashtag)", height=100, placeholder="Nhập caption…")
-            music_name = st.text_input("🎵 Âm nhạc sử dụng", placeholder="Tên bài hát…")
-            sel_model  = st.selectbox("🤖 Mô hình dự đoán", MODELS_LIST, index=2)
+            st.markdown('<div class="custom-label" style="display: flex; align-items: center; gap: 6px;"><span class="material-icons-round" style="color: #0072E5; font-size: 1.15rem; vertical-align: middle;">edit_note</span><span style="font-weight: 600; font-size: 0.85rem; color: var(--text); vertical-align: middle;">Nội dung Caption (kèm hashtag)</span></div>', unsafe_allow_html=True)
+            caption    = st.text_area("Nội dung Caption (kèm hashtag)", height=100, placeholder="Nhập caption…", label_visibility="collapsed")
+            
+            st.markdown('<div class="custom-label" style="display: flex; align-items: center; gap: 6px;"><span class="material-icons-round" style="color: #E91E63; font-size: 1.15rem; vertical-align: middle;">music_note</span><span style="font-weight: 600; font-size: 0.85rem; color: var(--text); vertical-align: middle;">Âm nhạc sử dụng</span></div>', unsafe_allow_html=True)
+            music_name = st.text_input("Âm nhạc sử dụng", placeholder="Tên bài hát…", label_visibility="collapsed")
+            
+            st.markdown('<div class="custom-label" style="display: flex; align-items: center; gap: 6px;"><span class="material-icons-round" style="color: #9C27B0; font-size: 1.15rem; vertical-align: middle;">smart_toy</span><span style="font-weight: 600; font-size: 0.85rem; color: var(--text); vertical-align: middle;">Mô hình dự đoán</span></div>', unsafe_allow_html=True)
+            sel_model  = st.selectbox("Mô hình dự đoán", MODELS_LIST, index=2, label_visibility="collapsed")
 
             v_val = l_val = s_val = "—"
             if (st.session_state.is_predicted
@@ -223,9 +236,17 @@ def tab_personal_content(processor_obj, models: dict) -> None:
                 s_val = f"{d['shares']:,}"
 
             c1, c2, c3 = st.columns(3)
-            c1.text_input("👀 Views (dự đoán)", value=v_val, disabled=True)
-            c2.text_input("❤️ Likes (dự đoán)", value=l_val, disabled=True)
-            c3.text_input("🔗 Shares (dự đoán)", value=s_val, disabled=True)
+            with c1:
+                st.markdown('<div class="custom-label" style="display: flex; align-items: center; gap: 6px;"><span class="material-icons-round" style="color: #003E8A; font-size: 1.15rem; vertical-align: middle;">visibility</span><span style="font-weight: 600; font-size: 0.85rem; color: var(--text); vertical-align: middle;">Views</span></div>', unsafe_allow_html=True)
+                st.text_input("Views", value=v_val, disabled=False, label_visibility="collapsed")
+
+            with c2:
+                st.markdown('<div class="custom-label" style="display: flex; align-items: center; gap: 6px;"><span class="material-icons-round" style="color: #FF2C55; font-size: 1.15rem; vertical-align: middle;">favorite</span><span style="font-weight: 600; font-size: 0.85rem; color: var(--text); vertical-align: middle;">Likes</span></div>', unsafe_allow_html=True)
+                st.text_input("Likes", value=l_val, disabled=False, label_visibility="collapsed")
+
+            with c3:
+                st.markdown('<div class="custom-label" style="display: flex; align-items: center; gap: 6px;"><span class="material-icons-round" style="color: #00C9C3; font-size: 1.15rem; vertical-align: middle;">share</span><span style="font-weight: 600; font-size: 0.85rem; color: var(--text); vertical-align: middle;">Shares</span></div>', unsafe_allow_html=True)
+                st.text_input("Shares", value=s_val, disabled=False, label_visibility="collapsed")
 
     st.markdown("<br>", unsafe_allow_html=True)
     btn_feat, btn_res, btn_pred = st.columns([1, 1, 1], gap="small")
@@ -237,27 +258,50 @@ def tab_personal_content(processor_obj, models: dict) -> None:
                 ["post_id", Col.AUTHOR, Col.CREATED_AT, Col.CAPTION_CLEAN, Col.HASHTAG_STR] + FEATURES
             ))
             keep_cols = [c for c in keep_cols if c in df_feat.columns]
+            
+            # Thay thế bằng icon file_download tròn mịn của Google nằm trong nút
             st.download_button(
-                "📥 Tải Feature CSV", data=df_feat[keep_cols].to_csv(index=False).encode("utf-8-sig"),
-                file_name="debug_feature.csv", mime="text/csv",
-                use_container_width=True, type="secondary",
+                ":material/file_download: Tải Feature CSV", 
+                data=df_feat[keep_cols].to_csv(index=False).encode("utf-8-sig"),
+                file_name="debug_feature.csv", 
+                mime="text/csv",
+                use_container_width=True, 
+                type="secondary",
             )
         else:
-            st.button("📥 Feature CSV (trống)", use_container_width=True, type="secondary", disabled=True)
+            # Thay thế bằng icon file_download_off để báo nút đang bị khóa/trống
+            st.button(
+                ":material/file_download_off: Feature CSV (trống)", 
+                use_container_width=True, 
+                type="secondary", 
+                disabled=True
+            )
 
     with btn_res:
         if st.session_state.is_predicted and st.session_state.result_data_df is not None:
+            # Thay thế bằng icon file_download chuẩn Google Material cho trạng thái có dữ liệu
             st.download_button(
-                "📥 Tải Result CSV",
+                ":material/file_download: Tải Result CSV",
                 data=st.session_state.result_data_df.to_csv(index=False).encode("utf-8-sig"),
                 file_name="result.csv", mime="text/csv",
                 use_container_width=True, type="secondary",
             )
         else:
-            st.button("📥 Result CSV (trống)", use_container_width=True, type="secondary", disabled=True)
+            # Thay thế bằng icon file_download_off cho trạng thái bảng trống
+            st.button(
+                ":material/file_download_off: Result CSV (trống)", 
+                use_container_width=True, 
+                type="secondary", 
+                disabled=True
+            )
 
     with btn_pred:
-        predict_clicked = st.button("🚀 Dự đoán", use_container_width=True, type="primary")
+        # Thay thế emoji tên lửa cũ bằng icon vector rocket_launch tròn mịn của Google
+        predict_clicked = st.button(
+            ":material/rocket_launch: Dự đoán", 
+            use_container_width=True, 
+            type="primary"
+        )
 
     if predict_clicked:
         if not kol_name:
@@ -286,11 +330,11 @@ def tab_personal_content(processor_obj, models: dict) -> None:
                 st.session_state.result_data_df   = payload["prediction_results"]
                 st.session_state.raw_history_tab2 = payload.get("raw_history", [])
                 st.session_state.is_predicted     = True
-                st.success("✅ Phân tích hoàn tất!")
+                st.success("Phân tích hoàn tất!", icon=":material/check_circle:")
                 time.sleep(0.4)
                 st.rerun()
             else:
-                st.error("❌ Không thể lấy dữ liệu hoặc xảy ra lỗi mô hình.")
+                st.error("Không thể lấy dữ liệu hoặc xảy ra lỗi mô hình.", icon=":material/error:")
 
     if (st.session_state.is_predicted
             and st.session_state.all_preds
@@ -298,12 +342,12 @@ def tab_personal_content(processor_obj, models: dict) -> None:
 
         st.markdown("---")
         cur = st.session_state.all_preds[sel_model]
-        section_header("📈", f"Kết quả dự đoán — {sel_model}")
+        section_header("trending_up", f"Kết quả dự đoán — {sel_model}")
         pred_cards(cur["views"], cur["likes"], cur["shares"])
 
         history_debug_expander(st.session_state.raw_history_tab2)
 
-        section_header("🧠", "Nhận xét & Gợi ý cải thiện nội dung")
+        section_header("psychology", "Nhận xét & Gợi ý cải thiện nội dung")
         recs = generate_recommendations(
             {"caption": caption, "music_name": music_name,
              "created_at": f"{post_date} {post_time}", "followers": followers},
@@ -313,7 +357,7 @@ def tab_personal_content(processor_obj, models: dict) -> None:
         for rec in recs:
             st.markdown(f'<div class="rec-item">💡 {rec}</div>', unsafe_allow_html=True)
 
-        section_header("🔍", "Feature đã trích xuất từ caption")
+        section_header("manage_search", "Feature đã trích xuất từ caption")
         extracted = processor_obj.extract_caption_features(caption)
         st.dataframe(pd.DataFrame([extracted]), use_container_width=True, hide_index=True)
 
@@ -321,35 +365,69 @@ def tab_personal_content(processor_obj, models: dict) -> None:
 # TAB 3 — BUSINESS / KOL COMPARISON
 # ════════════════════════════════════════════════════════════════════════════
 def tab_business_content(processor_obj, models: dict) -> None:
-    section_header("🏢", "So sánh & Lựa chọn KOL cho Doanh nghiệp")
+    section_header("business", "So sánh & Lựa chọn KOL cho Doanh nghiệp")
     st.info("Nhập thông tin chiến dịch và danh sách KOL — hệ thống tự động tính điểm và gợi ý Creator phù hợp nhất.")
 
-    with st.expander("⚙️ Cấu hình chiến dịch", expanded=True):
+    with st.expander(":material/settings: Cấu hình chiến dịch", expanded=True):
         c_l, c_r = st.columns(2, gap="large")
         with c_l:
-            biz_music = st.text_input("🎵 Âm nhạc", value="Original sound", key="biz_music")
-            biz_video_path = st.text_input("🎬 Đường dẫn MP4 (tuỳ chọn)", placeholder=r"C:\Video\tiktok.mp4", key="biz_video_path")
+            st.markdown('<div class="custom-label" style="display: flex; align-items: center; gap: 6px;"><span class="material-icons-round" style="color: #E91E63; font-size: 1.15rem; vertical-align: middle;">music_note</span><span style="font-weight: 600; font-size: 0.85rem; color: var(--text); vertical-align: middle;">Âm nhạc</span></div>', unsafe_allow_html=True)
+            biz_music = st.text_input("Âm nhạc", placeholder="Original sound", key="biz_music", label_visibility="collapsed")
+            st.markdown('<div class="custom-label" style="display: flex; align-items: center; gap: 6px;"><span class="material-icons-round" style="color: #FF2C55; font-size: 1.15rem; vertical-align: middle;">movie</span><span style="font-weight: 600; font-size: 0.85rem; color: var(--text); vertical-align: middle;">Đường dẫn MP4 (tuỳ chọn)</span></div>', unsafe_allow_html=True)
+            biz_video_path = st.text_input("Đường dẫn MP4 (tuỳ chọn)", placeholder=r"C:\Video\tiktok.mp4", key="biz_video_path", label_visibility="collapsed")
             c_d, c_t = st.columns(2)
-            biz_date  = c_d.date_input("Ngày đăng dự kiến", datetime.now(), key="biz_date")
-            biz_time  = c_t.time_input("Giờ đăng dự kiến",  dt_time(19, 0), key="biz_time")
+            st.markdown('<div class="custom-label" style="display: flex; align-items: center; gap: 6px;"><span class="material-icons-round" style="color: #0CAF60; font-size: 1.15rem; vertical-align: middle;">calendar_month</span><span style="font-weight: 600; font-size: 0.85rem; color: var(--text); vertical-align: middle;">Ngày đăng dự kiến</span></div>', unsafe_allow_html=True)
+            biz_date  = st.date_input("Ngày đăng dự kiến", datetime.now(), key="biz_date", label_visibility="collapsed")
+            st.markdown('<div class="custom-label" style="display: flex; align-items: center; gap: 6px;"><span class="material-icons-round" style="color: #F59E0B; font-size: 1.15rem; vertical-align: middle;">schedule</span><span style="font-weight: 600; font-size: 0.85rem; color: var(--text); vertical-align: middle;">Giờ đăng dự kiến</span></div>', unsafe_allow_html=True)
+            biz_time  = st.time_input("Giờ đăng dự kiến",  dt_time(19, 0), key="biz_time", label_visibility="collapsed")
         with c_r:
-            biz_caption = st.text_area("Nội dung Caption dự kiến", height=112,
-                                       value="Sản phẩm mới cực chất! #trending #review",
-                                       key="biz_caption")
-            biz_model = st.selectbox("🤖 Mô hình dự đoán", MODELS_LIST, index=2, key="biz_model")
+            st.markdown('<div class="custom-label" style="display: flex; align-items: center; gap: 6px;"><span class="material-icons-round" style="color: #0072E5; font-size: 1.15rem; vertical-align: middle;">edit_note</span><span style="font-weight: 600; font-size: 0.85rem; color: var(--text); vertical-align: middle;">Nội dung Caption dự kiến</span></div>', unsafe_allow_html=True)
+            biz_caption = st.text_area("Nội dung Caption dự kiến", height=112, placeholder="Sản phẩm mới cực chất! #trending #review", key="biz_caption", label_visibility="collapsed")
+            st.markdown('<div class="custom-label" style="display: flex; align-items: center; gap: 6px;"><span class="material-icons-round" style="color: #9C27B0; font-size: 1.15rem; vertical-align: middle;">smart_toy</span><span style="font-weight: 600; font-size: 0.85rem; color: var(--text); vertical-align: middle;">Mô hình dự đoán</span></div>', unsafe_allow_html=True)
+            biz_model = st.selectbox("Mô hình dự đoán", MODELS_LIST, index=2, key="biz_model", label_visibility="collapsed")
 
-    section_header("📋", "Danh sách Creator")
+    section_header("groups", "Danh sách Creator")
     edited_df = st.data_editor(
-        st.session_state.biz_kol_df, num_rows="dynamic",
-        use_container_width=True, hide_index=True,
+        st.session_state.biz_kol_df, 
+        num_rows="dynamic",
+        use_container_width=True,
+        column_config={
+            "name_of_creator": st.column_config.TextColumn(
+                "Tên Creator", 
+                help="Tên tài khoản người sáng tạo nội dung"
+            ),
+            "followers": st.column_config.NumberColumn(
+                "Followers", 
+                format="%d"
+            ),
+            "like_avg": st.column_config.NumberColumn(
+                "Likes Avg", 
+                format="%d"
+            ),
+            "view_avg": st.column_config.NumberColumn(
+                "Views Avg", 
+                format="%d"
+            ),
+            "share_avg": st.column_config.NumberColumn(
+                "Shares Avg", 
+                format="%d"
+            ),
+            "comment_avg": st.column_config.NumberColumn(
+                "Comments Avg", 
+                format="%d"
+            ),
+            "collects_avg": st.column_config.NumberColumn(
+                "Collects Avg", 
+                format="%d"
+            ),
+        }
     )
     st.session_state.biz_kol_df = edited_df
 
     col_auto, col_pred = st.columns(2, gap="small")
 
     with col_auto:
-        if st.button("🔄 Tự động lấy chỉ số trung bình từ TikTok",
-                     use_container_width=True, type="secondary"):
+        if st.button(":material/sync: Tự động lấy chỉ số trung bình từ TikTok", use_container_width=True, type="secondary"):
             with st.spinner("Đang cào dữ liệu TikTok…"):
                 tmp_df = st.session_state.biz_kol_df.copy()
                 all_logs: list = []
@@ -371,8 +449,7 @@ def tab_business_content(processor_obj, models: dict) -> None:
             st.rerun()
 
     with col_pred:
-        run_biz = st.button("📊 Dự đoán & Xếp hạng KOL",
-                            use_container_width=True, type="primary")
+        run_biz = st.button(":material/leaderboard: Dự đoán & Xếp hạng KOL",  use_container_width=True, type="primary")
 
     history_debug_expander(st.session_state.raw_history_tab3, extra_col="KOL")
 
@@ -429,10 +506,10 @@ def tab_business_content(processor_obj, models: dict) -> None:
             .reset_index(drop=True)
         )
 
-        section_header("🏆", "Kết quả xếp hạng KOL")
+        section_header("emoji_events", "Kết quả xếp hạng KOL")
         st.dataframe(result_df, use_container_width=True, hide_index=True)
 
-        section_header("📊", "Biểu đồ so sánh")
+        section_header("bar_chart", "Biểu đồ so sánh")
         fig = go.Figure([
             go.Bar(name="Views",  x=result_df["name_of_creator"], y=result_df["pred_views"],
                    marker_color="#003E8A", text=result_df["pred_views"],
@@ -496,9 +573,9 @@ def main() -> None:
     models        = load_ml_models()
 
     tab1, tab2, tab3 = st.tabs([
-        "📊 Tổng quan mô hình",
-        "👤 Ứng dụng cá nhân",
-        "🏢 Ứng dụng doanh nghiệp",
+        ":material/analytics: Tổng quan mô hình",
+        ":material/person: Ứng dụng cá nhân",
+        ":material/business: Ứng dụng doanh nghiệp",
     ])
 
     with tab1:
