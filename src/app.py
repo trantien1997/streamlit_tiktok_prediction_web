@@ -186,7 +186,7 @@ def generate_post_recommendations(raw_input: dict, prediction: dict) -> list[str
         recs.append("Âm thanh không phải Original sound; nên kiểm tra xem audio có đang trend hay không.")
 
     if followers > 0:
-        view_rate = prediction["pred_views"] / followers
+        view_rate = prediction.get("pred_views", 0) / followers if followers else 0
         if view_rate < 1:
             recs.append("View dự đoán thấp hơn followers; nên cải thiện hook 3 giây đầu và thumbnail/video mở đầu.")
         elif view_rate > 3:
@@ -200,13 +200,20 @@ def get_latest_history_videos(kol_name, limit=3):
         YTDLP_PATH, profile_url,
         "--cookies-from-browser", "chrome",
         "--dump-single-json",
-        "--playlist-end", str(limit),
-        "--quiet", "--no-warnings"
+        "--playlist-end", str(limit)
+        # TÔI ĐÃ XÓA "--quiet" VÀ "--no-warnings" ĐỂ XEM LỖI THẬT
     ]
     history_data = []
     
     try:
+        print(f"🔄 Đang cào dữ liệu từ: {profile_url}")
         result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", timeout=200)
+        
+        # ---> NẾU CHẠY THẤT BẠI, IN LỖI RA MÀN HÌNH <---
+        if result.returncode != 0:
+            print(f"❌ LỖI YT-DLP: {result.stderr}")
+            return []
+            
         if result.returncode == 0:
             entries = json.loads(result.stdout).get('entries', [])
             for entry in entries:
@@ -229,15 +236,14 @@ def get_latest_history_videos(kol_name, limit=3):
                     Col.MUSIC_NAME: entry.get("track", "Original sound")
                 }
                 history_data.append(stats)
-            print("DEBUG: Fetched history data:", history_data)
+            print("✅ Đã cào xong:", history_data)
         return history_data
-    except Exception:
+    except Exception as e:
+        print(f"❌ LỖI HỆ THỐNG TRONG HÀM: {e}")
         return []
 
 def run_prediction_for_new_video(my_input):
     history = get_latest_history_videos(my_input['kol_name'], limit=3)
-    if not history:
-        return None
 
     latest_video_timestamp_str = history[0].get(Col.CREATED_AT) if history else None
     if not latest_video_timestamp_str:
@@ -247,7 +253,7 @@ def run_prediction_for_new_video(my_input):
     for h in reversed(history):
         row = {
             Col.AUTHOR: my_input['kol_name'],
-            Col.MEDIA_URL: f"https://www.tiktok.com/@{my_input['kol_name']}/video/{h.get(Col.POST_ID, '')}",
+            Col.MEDIA_URL: f"https://www.tiktok.com/@{my_input['kol_name']}/video/{h.get('post_id', '')}",
             Col.CREATED_AT: h[Col.CREATED_AT],
             Col.CAPTION: h.get(Col.CAPTION, ""),
             Col.MUSIC_NAME: h.get(Col.MUSIC_NAME, ""),
@@ -273,7 +279,7 @@ def run_prediction_for_new_video(my_input):
     else:
         last_post_time = last_post_time.astimezone(Config.TIMEZONE_VN)
 
-    diff_days = max(0, (target_post_time - last_post_time).total_seconds() / 86400)
+    diff_days = max(0, (target_post_time - last_post_time).total_seconds() / 86400) if history else 0
 
     new_video_row = {
         Col.AUTHOR: my_input['kol_name'],
@@ -281,7 +287,7 @@ def run_prediction_for_new_video(my_input):
         Col.CREATED_AT: my_input['created_at'],
         Col.CAPTION: my_input['caption'],
         Col.MUSIC_NAME: my_input['music_name'],
-        Col.VIEWS: 0, Col.LIKES: 0, Col.SHARES: 0, "comments": 0, "collects": 0,
+        Col.VIEWS: 0, Col.LIKES: 0, Col.SHARES: 0, Col.COMMENTS: 0, Col.COLLECTS: 0,
         Col.FOLLOWERS: my_input['followers'], 
         Col.POST_ID: "TARGET_PREDICT"
     }
@@ -290,7 +296,14 @@ def run_prediction_for_new_video(my_input):
     df_all = pd.DataFrame(rows)
     df_all[Col.CREATED_AT] = pd.to_datetime(df_all[Col.CREATED_AT])
     processor.load_trends()
-    processed_df = processor.process_features(df_all)
+    
+    # --- Truyền video_path vào process_features ---
+    video_p = my_input.get('video_path', "").strip('\"').strip('\'')
+    if video_p and os.path.exists(video_p):
+        processed_df = processor.process_features(df_all, video_path=video_p)
+    else:
+        processed_df = processor.process_features(df_all)
+        
     target_data = processed_df[processed_df[Col.POST_ID] == "TARGET_PREDICT"].copy()
     
     # BẮT BUỘC GHI ĐÈ BẰNG KẾT QUẢ ĐÃ TÍNH ĐÚNG BÊN TRÊN
@@ -309,10 +322,10 @@ def run_prediction_for_new_video(my_input):
             
             return_dict[name] = {"views": v, "likes": l, "shares": s}
             prediction_results.append({
-                "author_username": my_input['kol_name'],
-                "media_url": "UNPUBLISHED",
-                "created_at": my_input['created_at'], 
-                "caption": my_input['caption'],
+                Col.AUTHOR: my_input['kol_name'],
+                Col.MEDIA_URL: "UNPUBLISHED",
+                Col.CREATED_AT: my_input['created_at'],
+                Col.CAPTION: my_input['caption'],
                 "model": name,
                 "pred_views": v, "pred_likes": l, "pred_shares": s
             })
@@ -423,7 +436,7 @@ tab_overview, tab_personal, tab_business = st.tabs([
     "🏢 Ứng dụng doanh nghiệp"
 ])
 
-# --- TAB 1: TỔNG QUAN MÔ HÌNH ---
+# --- TAB 1: OVERVIEW WEB ---
 with tab_overview:
     st.header("📈 Đánh giá hiệu năng các mô hình huấn luyện")
 
@@ -471,7 +484,7 @@ with tab_overview:
     except Exception as e:
         st.error(f"Có lỗi xảy ra khi đọc dữ liệu: {e}")
 
-# --- TAB 2: ỨNG DỤNG CÁ NHÂN ---
+# --- TAB 2: PERSONAL APPLICATION ---
 with tab_personal:
     st.header("👤 Dự đoán hiệu quả bài post cá nhân")
     
@@ -482,6 +495,8 @@ with tab_personal:
             kol_name = st.text_input("KOL Username", placeholder="Nhập username của KOL tại đây...", value="")
             st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True)
             followers = st.number_input("Số lượng Followers hiện tại", value=0)
+            st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True)
+            video_path_input = st.text_input("🎬 Đường dẫn Video MP4 (Tùy chọn)", placeholder=r"C:\Video\tiktok.mp4", value="")
             st.markdown("<div style='height: 15px;'></div>", unsafe_allow_html=True)
             
             c_date, c_time = st.columns(2)
@@ -525,10 +540,29 @@ with tab_personal:
         
         with c_btn1:
             if st.session_state.is_predicted and st.session_state.target_data_df is not None:
-                csv_feature = st.session_state.target_data_df.to_csv(index=False).encode('utf-8-sig')
+                df_feature = st.session_state.target_data_df.copy()
+                
+                # 1. Định nghĩa các cột thông tin cơ bản và text cần giữ lại
+                info_cols = [
+                    "post_id", Col.AUTHOR, Col.CREATED_AT, 
+                    Col.CAPTION_CLEAN, Col.HASHTAG_STR
+                ]
+                
+                # 2. Gộp danh sách: Cột cơ bản + Cột dùng để train (FEATURES)
+                cols_to_keep = info_cols + FEATURES
+                
+                # 3. Chỉ lọc lấy những cột thực sự tồn tại để tránh lỗi KeyError
+                valid_cols = [col for col in cols_to_keep if col in df_feature.columns]
+                
+                # 4. Xóa bỏ các tên cột bị trùng lặp (nếu có) nhưng vẫn giữ đúng thứ tự
+                valid_cols = list(dict.fromkeys(valid_cols))
+                
+                # 5. Ép kiểu và xuất CSV
+                csv_feature = df_feature[valid_cols].to_csv(index=False).encode('utf-8-sig')
+                
                 st.download_button(
                     label="📥 Save Feature (CSV)",
-                    data=csv_feature, file_name="debug_feature.csv", mime="text/csv",
+                    data=csv_feature, file_name="debug_feature_filtered.csv", mime="text/csv",
                     use_container_width=True, type="secondary"
                 )
             else:
@@ -562,9 +596,9 @@ with tab_personal:
                 "music_name": music_name, 
                 "kol_name": kol_name,
                 "followers": followers,
-                "created_at": created_at_str
+                "created_at": created_at_str,
+                "video_path": video_path_input
             }
-            
             res_payload = run_prediction_for_new_video(my_input)
             
             if res_payload:
@@ -597,8 +631,10 @@ with tab_personal:
                 log2_df = pd.DataFrame(st.session_state.raw_history_tab2)
                 if not log2_df.empty:
                     log2_df['Ngày đăng'] = pd.to_datetime(log2_df[Col.CREATED_AT]).dt.strftime('%Y-%m-%d %H:%M:%S')
-                    cols_to_show = [Col.POST_ID, 'Ngày đăng', Col.VIEWS, Col.LIKES, Col.SHARES, Col.COMMENTS, Col.COLLECTS]
+                    cols_to_show = ["post_id", 'Ngày đăng', Col.VIEWS, Col.LIKES, Col.SHARES, Col.COMMENTS, Col.COLLECTS]
                     st.dataframe(log2_df[cols_to_show], use_container_width=True, hide_index=True)
+        elif st.session_state.is_predicted:
+            st.info("⚠️ Không cào được video cũ từ TikTok. Dự đoán dựa hoàn toàn vào nội dung bạn vừa nhập.")
         
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("### 🧠 Nhận xét cải thiện nội dung")
@@ -683,7 +719,7 @@ with tab_business:
             log3_df = pd.DataFrame(st.session_state.raw_history_tab3)
             if not log3_df.empty:
                 log3_df['Ngày đăng'] = pd.to_datetime(log3_df[Col.CREATED_AT]).dt.strftime('%Y-%m-%d %H:%M:%S')
-                cols_to_show_3 = ['KOL', Col.POST_ID, 'Ngày đăng', Col.VIEWS, Col.LIKES, Col.SHARES, Col.COMMENTS, Col.COLLECTS]
+                cols_to_show_3 = ['KOL', "post_id", 'Ngày đăng', Col.VIEWS, Col.LIKES, Col.SHARES, Col.COMMENTS, Col.COLLECTS]
                 st.dataframe(log3_df[cols_to_show_3], use_container_width=True, hide_index=True)
 
     if st.button("📊 Dự đoán & Đề xuất KOL", type="primary", use_container_width=True):
